@@ -1,0 +1,7 @@
+node_modules/
+.env
+JayaElectric.exe
+inventory.db
+uploads/
+.vercel
+npm-debug.log*

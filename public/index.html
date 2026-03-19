@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,11 +9,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
+
 <body>
     <div class="app-container">
         <!-- Sidebar Navigation -->
         <nav class="sidebar">
-            <h2 class="brand">Jaya Electric</h2>
+            <h2 class="brand">VS Jaya Electric</h2>
             <ul class="nav-links">
                 <li class="active" data-target="dashboard">📊 Dashboard</li>
                 <li data-target="items">📦 Stok Barang</li>
@@ -35,7 +37,7 @@
                 <div class="view-header">
                     <h1>Ringkasan Penjualan</h1>
                 </div>
-                
+
                 <h3 style="margin-bottom:15px; color:#334155;">Data Penjualan Langsung</h3>
                 <div class="stats-grid">
                     <div class="stat-card">
@@ -56,10 +58,12 @@
                     </div>
                 </div>
 
-                <div style="background:#f1f5f9; border:1px solid #cbd5e1; padding:20px; border-radius:8px; margin-top:30px;">
+                <div
+                    style="background:#f1f5f9; border:1px solid #cbd5e1; padding:20px; border-radius:8px; margin-top:30px;">
                     <h3 style="margin-top:0; color:#334155;">Pencarian Kustom Berdasarkan Periode Waktu</h3>
                     <div style="display:flex; gap:10px; align-items:center; margin-top:10px;">
-                        <input type="date" id="dash-start" style="padding:8px; border:1px solid #ccc; border-radius:4px;">
+                        <input type="date" id="dash-start"
+                            style="padding:8px; border:1px solid #ccc; border-radius:4px;">
                         <span>s/d</span>
                         <input type="date" id="dash-end" style="padding:8px; border:1px solid #ccc; border-radius:4px;">
                         <button class="btn-secondary" id="btn-filter-dash">Cari Penjualan</button>
@@ -99,17 +103,20 @@
             <section id="items" class="view">
                 <div class="view-header">
                     <h1>Kelola Stok Barang</h1>
-                    <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+                    <div
+                        style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
                         <button class="btn-primary" id="btn-add-item">+ Tambah Barang Baru</button>
                         <div style="display:flex; gap:10px;">
                             <input type="file" id="import-file" style="display: none;" accept=".csv, .xlsx, .xls">
-                            <button class="btn-secondary" id="btn-import" onclick="document.getElementById('import-file').click()">📥 Import Excel/CSV</button>
+                            <button class="btn-secondary" id="btn-import"
+                                onclick="document.getElementById('import-file').click()">📥 Import Excel/CSV</button>
                             <select id="sort-items" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
                                 <option value="newest">Urutan Terbaru</option>
                                 <option value="stock-asc">Stok Terkecil</option>
                                 <option value="stock-desc">Stok Terbanyak</option>
                             </select>
-                            <select id="filter-category" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                            <select id="filter-category"
+                                style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
                                 <option value="">Semua Jenis Produk</option>
                                 <option value="Lampu">Lampu</option>
                                 <option value="Stop Kontak">Stop Kontak</option>
@@ -128,7 +135,6 @@
                                 <th>Gambar</th>
                                 <th>Nama Produk</th>
                                 <th>Jenis Produk</th>
-                                <th>Spesifikasi</th>
                                 <th>Merek</th>
                                 <th>Stok</th>
                                 <th>Harga Dasar</th>
@@ -148,16 +154,18 @@
                 <div class="view-header">
                     <h1>Kasir & Histori Transaksi</h1>
                     <div style="display:flex; gap:10px; align-items:center;">
-                        <label>Pencarian Histori (Default Hari Ini):</label>
-                        <input type="date" id="txlist-start" style="padding:8px; border:1px solid #ccc; border-radius:4px;">
+                        <label>Pencarian Histori:</label>
+                        <input type="date" id="txlist-start"
+                            style="padding:8px; border:1px solid #ccc; border-radius:4px;">
                         <span>s/d</span>
-                        <input type="date" id="txlist-end" style="padding:8px; border:1px solid #ccc; border-radius:4px;">
+                        <input type="date" id="txlist-end"
+                            style="padding:8px; border:1px solid #ccc; border-radius:4px;">
                         <button class="btn-secondary" id="btn-filter-txlist">Filter Histori</button>
                     </div>
                 </div>
-                
+
                 <div style="margin-bottom: 20px; display: flex; gap: 10px;">
-                    <button class="btn-danger" id="btn-new-purchase">Input Beli (Restock)</button>
+                    <button class="btn-danger" id="btn-new-purchase">Catat Beli (Restock)</button>
                     <button class="btn-primary" id="btn-new-sale">Catat Penjualan</button>
                 </div>
                 <div class="table-container">
@@ -187,12 +195,12 @@
             <h2 id="item-modal-title">Tambah Barang</h2>
             <form id="item-form">
                 <input type="hidden" id="item-id">
-                
+
                 <div class="form-group">
                     <label>Nama Produk (Bisa diisi keterangan juga) *</label>
                     <input type="text" id="item-nama" required>
                 </div>
-                
+
                 <div class="form-row">
                     <div class="form-group">
                         <label>Jenis Produk *</label>
@@ -212,7 +220,7 @@
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Harga Dasar (Beli) *</label>
+                        <label>Harga Beli *</label>
                         <input type="number" id="item-harga-beli" min="0" required>
                     </div>
                     <div class="form-group">
@@ -232,8 +240,10 @@
                     </div>
                 </div>
 
-                <div id="dynamic-specs-container" style="background:#f1f5f9; padding:15px; border-radius:6px; margin-bottom:15px;">
-                    <p style="font-size:0.9rem; color:#64748b; margin-bottom:10px;">Spesifikasi Tambahan (Otomatis berdasarkan Kategori)</p>
+                <div id="dynamic-specs-container"
+                    style="background:#f1f5f9; padding:15px; border-radius:6px; margin-bottom:15px;">
+                    <p style="font-size:0.9rem; color:#64748b; margin-bottom:10px;">Spesifikasi Tambahan (Otomatis
+                        berdasarkan Kategori)</p>
                     <div id="dynamic-specs-fields">
                         <span style="font-size:0.8rem;">Pilih kategori terlebih dahulu...</span>
                     </div>
@@ -252,8 +262,10 @@
         <div class="modal-content tx-modal-content">
             <h2 id="tx-modal-title">Buat Transaksi</h2>
             <div style="margin-bottom:15px;">
-                <label style="display:block; margin-bottom:5px; font-weight:500;">Waktu Transaksi (Boleh digeser mundur):</label>
-                <input type="datetime-local" id="tx-date" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:100%;" required>
+                <label style="display:block; margin-bottom:5px; font-weight:500;">Waktu Transaksi (Boleh digeser
+                    mundur):</label>
+                <input type="datetime-local" id="tx-date"
+                    style="padding:8px; border:1px solid #ccc; border-radius:4px; width:100%;" required>
             </div>
             <div class="tx-layout">
                 <div class="tx-left">
@@ -265,7 +277,8 @@
                     </div>
                 </div>
                 <div class="tx-right">
-                    <table class="tx-cart-table" style="width:100%; text-align:left; border-collapse: collapse; margin-bottom: 20px;">
+                    <table class="tx-cart-table"
+                        style="width:100%; text-align:left; border-collapse: collapse; margin-bottom: 20px;">
                         <thead style="border-bottom: 2px solid #e2e8f0;">
                             <tr>
                                 <th style="padding:10px;">Barang</th>
@@ -335,4 +348,5 @@
 
     <script src="app.js"></script>
 </body>
+
 </html>

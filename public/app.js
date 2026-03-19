@@ -298,7 +298,6 @@ function renderItems(data) {
             <td><img src="${item.image_url || 'https://via.placeholder.com/50'}" class="item-img" alt="Gambar"></td>
             <td>${item.nama_produk}</td>
             <td>${item.jenis_produk}</td>
-            <td>${renderSpecs(item.spesifikasi)}</td>
             <td>${item.merek || '-'}</td>
             <td><strong>${item.stok}</strong></td>
             <td>${formatRp(item.harga_dasar)}</td>

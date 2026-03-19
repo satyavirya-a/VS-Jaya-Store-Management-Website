@@ -55,16 +55,8 @@ const initializeDB = async () => {
 
 initializeDB();
 
-const uploadDir = path.join(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir);
-}
-app.use('/uploads', express.static(uploadDir));
-
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) { cb(null, uploadDir) },
-    filename: function (req, file, cb) { cb(null, Date.now() + path.extname(file.originalname)) }
-});
+// Convert to Serverless Memory Storage
+const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
 // Helper Query (PostgreSQL pool.query)
@@ -89,7 +81,11 @@ app.get('/api/items/lowstock', async (req, res) => {
 
 app.post('/api/items', upload.single('image'), async (req, res) => {
     const { nama_produk, jenis_produk, merek, harga_dasar, harga_jual, stok, spesifikasi } = req.body;
-    const imageUrl = req.file ? '/uploads/' + req.file.filename : null;
+    let imageUrl = null;
+    if (req.file) {
+        const b64 = req.file.buffer.toString('base64');
+        imageUrl = `data:${req.file.mimetype};base64,${b64}`;
+    }
     
     const client = await pool.connect();
     try {
@@ -159,7 +155,8 @@ app.put('/api/items/:id', upload.single('image'), async (req, res) => {
     const { nama_produk, jenis_produk, merek, harga_dasar, harga_jual, stok, spesifikasi } = req.body;
     try {
         if (req.file) {
-            const imageUrl = '/uploads/' + req.file.filename;
+            const b64 = req.file.buffer.toString('base64');
+            const imageUrl = `data:${req.file.mimetype};base64,${b64}`;
             const q = `UPDATE items SET nama_produk=$1, jenis_produk=$2, merek=$3, harga_dasar=$4, harga_jual=$5, stok=$6, image_url=$7, spesifikasi=$8 WHERE id=$9`;
             await pool.query(q, [nama_produk, jenis_produk, merek, parseInt(harga_dasar)||0, parseInt(harga_jual)||0, parseInt(stok)||0, imageUrl, spesifikasi || '{}', id]);
         } else {

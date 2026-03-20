@@ -17,7 +17,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Gunakan ssl rejectUnauthorized false wajib untuk Supabase
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
+    ssl: { rejectUnauthorized: false },
+    max: 1, // Membatasi max pooler di Vercel Serverless
+    idleTimeoutMillis: 3000,
+    connectionTimeoutMillis: 5000
 });
 
 const initializeDB = async () => {

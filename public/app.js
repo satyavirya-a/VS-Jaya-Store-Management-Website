@@ -272,6 +272,10 @@ async function loadDashboard(start='', end='') {
         
         const res = await fetch(url);
         const data = await res.json();
+        if (!res.ok) {
+            console.error("Dashboard Error:", data.error);
+            return;
+        }
         
         document.getElementById('dash-income-today').textContent = formatRp(data.pemasukanHariIni);
         document.getElementById('dash-profit-today').textContent = formatRp(data.profitHariIni);
@@ -289,6 +293,10 @@ async function loadDashboard(start='', end='') {
         const lowRes = await fetch('/api/items/lowstock');
         const lowData = await lowRes.json();
         const tbody = document.getElementById('low-stock-body');
+        if (!lowRes.ok) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:red;">Error: DB/Vercel ${lowData.error || 'Server error'}</td></tr>`;
+            return;
+        }
         tbody.innerHTML = '';
         if(lowData.length === 0) {
             tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Stok semua barang aman!</td></tr>';
@@ -310,9 +318,16 @@ async function loadDashboard(start='', end='') {
 async function loadItems() {
     try {
         const res = await fetch('/api/items');
-        items = await res.json();
+        const data = await res.json();
+        if (!res.ok) {
+            alert(`Gagal memuat barang dari server. Jika di Vercel, pastikan DATABASE_URL sudah di-setting. Pesan error: ${data.error}`);
+            items = [];
+            document.getElementById('sort-items').dispatchEvent(new Event('change'));
+            return;
+        }
+        items = data;
         document.getElementById('sort-items').dispatchEvent(new Event('change'));
-    } catch(e) { console.error(e); }
+    } catch(e) { console.error(e); items = []; }
 }
 
 async function loadTransactions(start='', end='') {
@@ -320,9 +335,15 @@ async function loadTransactions(start='', end='') {
         let url = '/api/transactions';
         if(start && end) url += `?start=${start}&end=${end}`;
         const res = await fetch(url);
-        transactions = await res.json();
+        const data = await res.json();
+        if (!res.ok) {
+            console.error("Tx Error:", data.error);
+            transactions = [];
+            return renderTransactions(transactions);
+        }
+        transactions = data;
         renderTransactions(transactions);
-    } catch(e) { console.error(e); }
+    } catch(e) { console.error(e); transactions = []; }
 }
 
 // Render Functions

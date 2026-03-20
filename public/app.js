@@ -39,10 +39,36 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Items
+    document.getElementById('btn-toggle-kategori').addEventListener('click', (e) => {
+        const selCat = document.getElementById('item-kategori');
+        const inpCat = document.getElementById('item-kategori-baru');
+        const btn = e.target;
+        if(inpCat.style.display === 'none') {
+            selCat.style.display = 'none';
+            inpCat.style.display = 'block';
+            inpCat.required = true;
+            selCat.required = false;
+            btn.textContent = 'Kembali';
+            inpCat.focus();
+        } else {
+            selCat.style.display = 'block';
+            inpCat.style.display = 'none';
+            inpCat.required = false;
+            selCat.required = true;
+            btn.textContent = '+ Bebas';
+        }
+    });
+
     document.getElementById('btn-add-item').addEventListener('click', () => {
         document.getElementById('item-form').reset();
         document.getElementById('item-id').value = '';
         document.getElementById('item-modal').dataset.specs = '{}';
+        
+        // Reset to dropdown view if text view is active
+        if(document.getElementById('item-kategori-baru').style.display === 'block') {
+            document.getElementById('btn-toggle-kategori').click();
+        }
+
         document.getElementById('item-kategori').dispatchEvent(new Event('change'));
         document.getElementById('item-modal-title').textContent = 'Tambah Barang Baru';
         document.getElementById('item-modal').classList.add('active');
@@ -113,10 +139,14 @@ document.addEventListener('DOMContentLoaded', () => {
         btnSubmit.textContent = 'Menyimpan...';
         btnSubmit.disabled = true;
 
+        const catVal = document.getElementById('item-kategori-baru').style.display === 'block' 
+            ? document.getElementById('item-kategori-baru').value 
+            : document.getElementById('item-kategori').value;
+
         const id = document.getElementById('item-id').value;
         const formData = new FormData();
         formData.append('nama_produk', document.getElementById('item-nama').value);
-        formData.append('jenis_produk', document.getElementById('item-kategori').value);
+        formData.append('jenis_produk', catVal);
         formData.append('merek', document.getElementById('item-merk').value);
         formData.append('harga_dasar', document.getElementById('item-harga-beli').value);
         formData.append('harga_jual', document.getElementById('item-harga-jual').value);
@@ -326,8 +356,29 @@ async function loadItems() {
             return;
         }
         items = data;
+        updateCategoryDropdowns();
         document.getElementById('sort-items').dispatchEvent(new Event('change'));
     } catch(e) { console.error(e); items = []; }
+}
+
+function updateCategoryDropdowns() {
+    const defaultCats = ['Lampu', 'Stop Kontak', 'Steker', 'Kabel', 'Lainnya'];
+    const dbCats = items.map(i => i.jenis_produk);
+    const allCats = [...new Set([...defaultCats, ...dbCats])].filter(Boolean);
+
+    // Update Filter Select
+    const filterSelect = document.getElementById('filter-category');
+    const currentFilter = filterSelect.value;
+    filterSelect.innerHTML = '<option value="">Semua Jenis Produk</option>';
+    allCats.forEach(c => filterSelect.innerHTML += `<option value="${c}">${c}</option>`);
+    filterSelect.value = currentFilter;
+
+    // Update Form Select
+    const formSelect = document.getElementById('item-kategori');
+    const currentSelected = formSelect.value;
+    formSelect.innerHTML = '';
+    allCats.forEach(c => formSelect.innerHTML += `<option value="${c}">${c}</option>`);
+    if(currentSelected && allCats.includes(currentSelected)) formSelect.value = currentSelected;
 }
 
 async function loadTransactions(start='', end='') {

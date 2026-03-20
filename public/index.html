@@ -204,13 +204,17 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>Jenis Produk *</label>
-                        <select id="item-kategori" required>
-                            <option value="Lampu">Lampu</option>
-                            <option value="Stop Kontak">Stop Kontak</option>
-                            <option value="Steker">Steker</option>
-                            <option value="Kabel">Kabel</option>
-                            <option value="Lainnya">Lainnya</option>
-                        </select>
+                        <div style="display:flex; gap:8px;">
+                            <select id="item-kategori" required style="flex:1;">
+                                <option value="Lampu">Lampu</option>
+                                <option value="Stop Kontak">Stop Kontak</option>
+                                <option value="Steker">Steker</option>
+                                <option value="Kabel">Kabel</option>
+                                <option value="Lainnya">Lainnya</option>
+                            </select>
+                            <input type="text" id="item-kategori-baru" style="display:none; flex:1;" placeholder="Nama Kategori Baru">
+                            <button type="button" class="btn-secondary" id="btn-toggle-kategori" style="width: auto; padding: 0 10px;" title="Tambah Kategori Custom Bebas">+ Bebas</button>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>Merek</label>

@@ -1,4 +1,4 @@
-# Jaya Electric Inventory System
+# VS Jaya Electric Inventory System
 A Cloud-based Inventory Management and Point of Sale (POS) system for electrical supply stores, powered by Node.js, PostgreSQL, and Supabase.
 
 ## Key Features

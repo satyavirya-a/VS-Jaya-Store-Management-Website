@@ -241,6 +241,36 @@ app.get('/api/items/:id/history', async (req, res) => {
     } catch(err) { res.status(500).json({ error: err.message }); }
 });
 
+app.delete('/api/transactions/:id', async (req, res) => {
+    const { id } = req.params;
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        
+        const txRes = await client.query('SELECT tipe_transaksi FROM transactions WHERE id = $1', [id]);
+        if (txRes.rows.length === 0) throw new Error("Transaksi tidak ditemukan");
+        const tipe_transaksi = txRes.rows[0].tipe_transaksi;
+        
+        const detailsRes = await client.query('SELECT item_id, jumlah FROM transaction_details WHERE transaction_id = $1', [id]);
+        
+        for(let d of detailsRes.rows) {
+            if (tipe_transaksi === 'PENJUALAN') {
+                await client.query('UPDATE items SET stok = stok + $1 WHERE id = $2', [d.jumlah, d.item_id]);
+            } else if (tipe_transaksi === 'PEMBELIAN') {
+                await client.query('UPDATE items SET stok = GREATEST(stok - $1, 0) WHERE id = $2', [d.jumlah, d.item_id]);
+            }
+        }
+        
+        await client.query('DELETE FROM transactions WHERE id = $1', [id]);
+        
+        await client.query('COMMIT');
+        res.json({ success: true, deleted: true });
+    } catch(err) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: err.message });
+    } finally { client.release(); }
+});
+
 // Dashboard
 app.get('/api/dashboard', async (req, res) => {
     const { start, end } = req.query;

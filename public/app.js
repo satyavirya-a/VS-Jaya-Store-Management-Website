@@ -381,7 +381,10 @@ function renderTransactions(data) {
             <td>${new Date(tx.tanggal).toLocaleString('id-ID')}</td>
             <td><strong style="color: ${isSales ? 'var(--success)' : 'var(--primary)'}">${tx.tipe_transaksi}</strong></td>
             <td><strong>${formatRp(tx.total_transaksi)}</strong></td>
-            <td><button class="btn-secondary" style="padding:4px 8px; font-size:0.8rem;" onclick="openTxDetail(${tx.id})">Lihat Detail</button></td>
+            <td>
+                <button class="btn-secondary" style="padding:4px 8px; font-size:0.8rem;" onclick="openTxDetail(${tx.id})">Detail</button>
+                <button class="btn-danger" style="padding:4px 8px; font-size:0.8rem; margin-left:4px;" onclick="deleteTransaction(${tx.id})">Batal</button>
+            </td>
         `;
         tbody.appendChild(tr);
     });
@@ -452,6 +455,29 @@ window.openTxDetail = async function(txId) {
         });
         document.getElementById('tx-detail-modal').classList.add('active');
     } catch(e) { console.error(e); }
+}
+
+window.deleteTransaction = async function(id) {
+    if(!confirm(`PERINGATAN! Anda yakin ingin MEMBATALKAN transaksi #TX-${id.toString().padStart(4, '0')}?\n\nStok barang akan otomatis dikembalikan ke status semula.`)) return;
+    
+    try {
+        const res = await fetch(`/api/transactions/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        
+        if (res.ok && data.success) {
+            alert('Transaksi berhasil dibatalkan dan stok telah disesuaikan.');
+            const start = document.getElementById('txlist-start').value;
+            const end = document.getElementById('txlist-end').value;
+            loadTransactions(start, end);
+            loadDashboard(start, end);
+            loadItems(); 
+        } else {
+            alert('Gagal membatalkan transaksi: ' + (data.error || 'Server error'));
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Kesalahan jaringan saat membatalkan transaksi.');
+    }
 }
 
 // Transaction Cart

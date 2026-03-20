@@ -212,8 +212,11 @@
                                 <option value="Kabel">Kabel</option>
                                 <option value="Lainnya">Lainnya</option>
                             </select>
-                            <input type="text" id="item-kategori-baru" style="display:none; flex:1;" placeholder="Nama Kategori Baru">
-                            <button type="button" class="btn-secondary" id="btn-toggle-kategori" style="width: auto; padding: 0 10px;" title="Tambah Kategori Custom Bebas">+ Bebas</button>
+                            <input type="text" id="item-kategori-baru" style="display:none; flex:1;"
+                                placeholder="Nama Kategori Baru">
+                            <button type="button" class="btn-secondary" id="btn-toggle-kategori"
+                                style="width: auto; padding: 0 10px;" title="Tambah Kategori Custom Bebas">+
+                                Tambah</button>
                         </div>
                     </div>
                     <div class="form-group">
@@ -266,8 +269,7 @@
         <div class="modal-content tx-modal-content">
             <h2 id="tx-modal-title">Buat Transaksi</h2>
             <div style="margin-bottom:15px;">
-                <label style="display:block; margin-bottom:5px; font-weight:500;">Waktu Transaksi (Boleh digeser
-                    mundur):</label>
+                <label style="display:block; margin-bottom:5px; font-weight:500;">Waktu Transaksi</label>
                 <input type="datetime-local" id="tx-date"
                     style="padding:8px; border:1px solid #ccc; border-radius:4px; width:100%;" required>
             </div>
@@ -281,21 +283,23 @@
                     </div>
                 </div>
                 <div class="tx-right">
-                    <table class="tx-cart-table"
-                        style="width:100%; text-align:left; border-collapse: collapse; margin-bottom: 20px;">
-                        <thead style="border-bottom: 2px solid #e2e8f0;">
-                            <tr>
-                                <th style="padding:10px;">Barang</th>
-                                <th>Harga</th>
-                                <th>Qty</th>
-                                <th>Subtotal</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="tx-cart-body">
-                            <!-- Cart Items -->
-                        </tbody>
-                    </table>
+                    <div style="width: 100%; overflow-x: auto; margin-bottom: 20px;">
+                        <table class="tx-cart-table"
+                            style="width:100%; text-align:left; border-collapse: collapse; min-width: 450px;">
+                            <thead style="border-bottom: 2px solid #e2e8f0;">
+                                <tr>
+                                    <th style="padding:10px;">Barang</th>
+                                    <th>Harga</th>
+                                    <th>Qty</th>
+                                    <th>Subtotal</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="tx-cart-body">
+                                <!-- Cart Items -->
+                            </tbody>
+                        </table>
+                    </div>
                     <div class="tx-summary">
                         <h3>Total: <span id="tx-total">Rp 0</span></h3>
                         <input type="hidden" id="tx-type" value="PENJUALAN">

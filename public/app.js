@@ -107,6 +107,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('item-form').addEventListener('submit', async (e) => {
         e.preventDefault();
+        
+        const btnSubmit = e.target.querySelector('button[type="submit"]');
+        const originalText = btnSubmit.textContent;
+        btnSubmit.textContent = 'Menyimpan...';
+        btnSubmit.disabled = true;
+
         const id = document.getElementById('item-id').value;
         const formData = new FormData();
         formData.append('nama_produk', document.getElementById('item-nama').value);
@@ -123,7 +129,15 @@ document.addEventListener('DOMContentLoaded', () => {
         formData.append('spesifikasi', JSON.stringify(specs));
 
         const fileInput = document.getElementById('item-image');
-        if (fileInput.files.length > 0) formData.append('image', fileInput.files[0]);
+        if (fileInput.files.length > 0) {
+            try {
+                const compressedFile = await compressImage(fileInput.files[0]);
+                formData.append('image', compressedFile);
+            } catch (err) {
+                console.error("Gagal kompresi, menggunakan file asli", err);
+                formData.append('image', fileInput.files[0]);
+            }
+        }
 
         const url = id ? `/api/items/${id}` : '/api/items';
         const method = id ? 'PUT' : 'POST';
@@ -134,8 +148,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('item-modal').classList.remove('active');
                 loadItems();
                 loadDashboard();
-            } else alert("Gagal menyimpan barang");
-        } catch(err) { console.error(err); }
+                alert("Barang berhasil disimpan!");
+            } else {
+                alert("Gagal menyimpan barang");
+            }
+        } catch(err) { 
+            console.error(err);
+            alert("Kesalahan jaringan: Terjadi masalah koneksi atau file foto terlalu besar.");
+        } finally {
+            btnSubmit.textContent = originalText;
+            btnSubmit.disabled = false;
+        }
     });
 
     function applyItemFilters() {
@@ -168,8 +191,14 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTxSearchResults(results);
     });
 
-    document.getElementById('btn-submit-tx').addEventListener('click', async () => {
+    document.getElementById('btn-submit-tx').addEventListener('click', async (e) => {
         if (txCart.length === 0) return alert('Keranjang kosong!');
+        
+        const btnSubmit = e.target;
+        const originalText = btnSubmit.textContent;
+        btnSubmit.textContent = 'Memproses...';
+        btnSubmit.disabled = true;
+
         const tipe = document.getElementById('tx-type').value;
         const tanggal = document.getElementById('tx-date').value;
         const total = txCart.reduce((sum, item) => sum + (item.qty * item.harga_input), 0);
@@ -198,8 +227,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadDashboard();
                 loadItems();
                 alert('Transaksi berhasil disimpan!');
-            } else alert('Gagal menyimpan transaksi');
-        } catch (e) { console.error(e); }
+            } else {
+                alert('Gagal menyimpan transaksi');
+            }
+        } catch (e) { 
+            console.error(e);
+            alert('Kesalahan jaringan saat memproses transaksi.');
+        } finally {
+            btnSubmit.textContent = originalText;
+            btnSubmit.disabled = false;
+        }
     });
 
     // Dashboard Filter
@@ -550,5 +587,47 @@ function buildDynamicForm(kategori, existingData = {}) {
             <input type="text" class="dynamic-spec-input" data-key="${field}" value="${val}" placeholder="Opsional...">
         `;
         container.appendChild(group);
+    });
+}
+
+// Helper: Compress Image Before Upload (Untuk mencegah Vercel Payload Limit ERR_CONNECTION_RESET)
+async function compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0.7) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = event => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > maxWidth) {
+                        height *= maxWidth / width;
+                        width = maxWidth;
+                    }
+                } else {
+                    if (height > maxHeight) {
+                        width *= maxHeight / height;
+                        height = maxHeight;
+                    }
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                canvas.toBlob((blob) => {
+                    resolve(new File([blob], file.name, {
+                        type: file.type || 'image/jpeg',
+                        lastModified: Date.now()
+                    }));
+                }, file.type || 'image/jpeg', quality);
+            };
+            img.onerror = error => reject(error);
+        };
+        reader.onerror = error => reject(error);
     });
 }

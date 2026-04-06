@@ -3,7 +3,8 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
+types.setTypeParser(1114, str => str.replace(' ', 'T'));
 require('dotenv').config();
 
 const app = express();
@@ -98,7 +99,7 @@ app.post('/api/items', upload.single('image'), async (req, res) => {
         const resItem = await client.query(q, [nama_produk, jenis_produk, merek || '-', parseInt(harga_dasar)||0, parseInt(harga_jual)||0, parseInt(stok)||0, imageUrl, spesifikasi || '{}']);
         const itemId = resItem.rows[0].id;
         
-        const txQ = `INSERT INTO transactions (tipe_transaksi, total_transaksi) VALUES ('PEMBELIAN', $1) RETURNING id`;
+        const txQ = `INSERT INTO transactions (tipe_transaksi, total_transaksi, tanggal) VALUES ('PEMBELIAN', $1, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jakarta')) RETURNING id`;
         const txRes = await client.query(txQ, [(parseInt(harga_dasar)||0) * (parseInt(stok)||0)]);
         const txId = txRes.rows[0].id;
         
@@ -141,7 +142,7 @@ app.post('/api/items/bulk', async (req, res) => {
             const resItem = await client.query(q, [n, jenis, m, dasar, jual, s, JSON.stringify(specs)]);
             const itemId = resItem.rows[0].id;
             
-            const txRes = await client.query(`INSERT INTO transactions (tipe_transaksi, total_transaksi) VALUES ('PEMBELIAN', $1) RETURNING id`, [dasar * s]);
+            const txRes = await client.query(`INSERT INTO transactions (tipe_transaksi, total_transaksi, tanggal) VALUES ('PEMBELIAN', $1, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jakarta')) RETURNING id`, [dasar * s]);
             await client.query(`INSERT INTO transaction_details (transaction_id, item_id, jumlah, harga_satuan, keuntungan) VALUES ($1, $2, $3, $4, 0)`, [txRes.rows[0].id, itemId, s, dasar]);
             count++;
         }
@@ -180,7 +181,7 @@ app.delete('/api/items/:id', async (req, res) => {
 // APIs: Transactions
 app.post('/api/transactions', async (req, res) => {
     const { tipe_transaksi, total_transaksi, items, tanggal } = req.body;
-    let tanggalFormatted = tanggal ? tanggal.replace('T', ' ') + ':00' : new Date().toISOString().replace('T', ' ').substring(0, 19);
+    let tanggalFormatted = tanggal ? tanggal.replace('T', ' ') + (tanggal.length <= 16 ? ':00' : '') : new Date(Date.now() + 7 * 3600 * 1000).toISOString().replace('T', ' ').substring(0, 19);
     
     const client = await pool.connect();
     try {
@@ -218,7 +219,7 @@ app.get('/api/transactions', async (req, res) => {
             result = await pool.query("SELECT * FROM transactions WHERE DATE(tanggal) >= $1 AND DATE(tanggal) <= $2 ORDER BY tanggal DESC", [start, end]);
         } else {
             // Postgres local time equivalent (if timezone set)
-            result = await pool.query("SELECT * FROM transactions WHERE DATE(tanggal) = CURRENT_DATE ORDER BY tanggal DESC");
+            result = await pool.query("SELECT * FROM transactions WHERE DATE(tanggal) = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jakarta')::DATE ORDER BY tanggal DESC");
         }
         res.json(result.rows);
     } catch(err) { res.status(500).json({ error: err.message }); }
@@ -277,16 +278,16 @@ app.get('/api/dashboard', async (req, res) => {
     try {
         const results = { profitHariIni:0, pemasukanHariIni:0, profitBulanIni:0, pemasukanBulanIni:0, profitFilter:0, pemasukanFilter:0 };
         
-        let hp = await pool.query(`SELECT SUM(keuntungan) as total FROM transaction_details td JOIN transactions t ON td.transaction_id = t.id WHERE t.tipe_transaksi='PENJUALAN' AND DATE(t.tanggal) = CURRENT_DATE`);
+        let hp = await pool.query(`SELECT SUM(keuntungan) as total FROM transaction_details td JOIN transactions t ON td.transaction_id = t.id WHERE t.tipe_transaksi='PENJUALAN' AND DATE(t.tanggal) = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jakarta')::DATE`);
         results.profitHariIni = hp.rows[0].total || 0;
         
-        let hm = await pool.query(`SELECT SUM(total_transaksi) as total FROM transactions t WHERE t.tipe_transaksi='PENJUALAN' AND DATE(t.tanggal) = CURRENT_DATE`);
+        let hm = await pool.query(`SELECT SUM(total_transaksi) as total FROM transactions t WHERE t.tipe_transaksi='PENJUALAN' AND DATE(t.tanggal) = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jakarta')::DATE`);
         results.pemasukanHariIni = hm.rows[0].total || 0;
         
-        let bmp = await pool.query(`SELECT SUM(keuntungan) as total FROM transaction_details td JOIN transactions t ON td.transaction_id = t.id WHERE t.tipe_transaksi='PENJUALAN' AND EXTRACT(MONTH FROM t.tanggal) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM t.tanggal) = EXTRACT(YEAR FROM CURRENT_DATE)`);
+        let bmp = await pool.query(`SELECT SUM(keuntungan) as total FROM transaction_details td JOIN transactions t ON td.transaction_id = t.id WHERE t.tipe_transaksi='PENJUALAN' AND EXTRACT(MONTH FROM t.tanggal) = EXTRACT(MONTH FROM (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jakarta')::DATE) AND EXTRACT(YEAR FROM t.tanggal) = EXTRACT(YEAR FROM (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jakarta')::DATE)`);
         results.profitBulanIni = bmp.rows[0].total || 0;
         
-        let bm = await pool.query(`SELECT SUM(total_transaksi) as total FROM transactions t WHERE t.tipe_transaksi='PENJUALAN' AND EXTRACT(MONTH FROM t.tanggal) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM t.tanggal) = EXTRACT(YEAR FROM CURRENT_DATE)`);
+        let bm = await pool.query(`SELECT SUM(total_transaksi) as total FROM transactions t WHERE t.tipe_transaksi='PENJUALAN' AND EXTRACT(MONTH FROM t.tanggal) = EXTRACT(MONTH FROM (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jakarta')::DATE) AND EXTRACT(YEAR FROM t.tanggal) = EXTRACT(YEAR FROM (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jakarta')::DATE)`);
         results.pemasukanBulanIni = bm.rows[0].total || 0;
 
         if (start && end) {

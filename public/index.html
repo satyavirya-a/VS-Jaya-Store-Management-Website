@@ -354,6 +354,25 @@
         </div>
     </div>
 
+    <!-- Quick Restock Confirmation Prompt Modal -->
+    <div class="modal-overlay" id="restock-prompt-modal">
+        <div class="modal-content" style="max-width: 480px; text-align: center;">
+            <div style="font-size: 2.8rem; margin-bottom: 8px;">⚠️</div>
+            <h2 id="restock-prompt-title" style="color: #b91c1c; margin-bottom: 8px;">Stok Tidak Mencukupi</h2>
+            <p id="restock-prompt-message" style="color: var(--text-light); font-size: 0.95rem; line-height: 1.5; margin-bottom: 16px;">
+                Stok barang ini tidak mencukupi untuk dicatat sebagai penjualan. Apakah Anda ingin langsung menambah stok (Restock) sekarang?
+            </p>
+            <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px; margin-bottom: 20px; text-align: left;">
+                <div style="font-weight: 600; color: #991b1b;" id="restock-prompt-item-name">-</div>
+                <div style="font-size: 0.85rem; color: #b91c1c; margin-top: 4px;" id="restock-prompt-stock-info">Sisa Stok: 0</div>
+            </div>
+            <div class="modal-actions" style="justify-content: center; gap: 12px;">
+                <button type="button" class="btn-secondary btn-close-modal" id="btn-cancel-restock">Batal</button>
+                <button type="button" class="btn-primary" id="btn-confirm-restock" style="background: #16a34a;">📦 Ya, Restock Sekarang</button>
+            </div>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 

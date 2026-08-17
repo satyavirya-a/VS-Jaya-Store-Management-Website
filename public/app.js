@@ -2,6 +2,7 @@
 let items = [];
 let transactions = [];
 let txCart = [];
+let pendingRestockItem = null;
 
 // DOM Elements
 const views = document.querySelectorAll('.view');
@@ -143,6 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ? document.getElementById('item-kategori-baru').value 
             : document.getElementById('item-kategori').value;
 
+        const validStok = Math.max(0, parseInt(document.getElementById('item-stok').value) || 0);
         const id = document.getElementById('item-id').value;
         const formData = new FormData();
         formData.append('nama_produk', document.getElementById('item-nama').value);
@@ -150,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
         formData.append('merek', document.getElementById('item-merk').value);
         formData.append('harga_dasar', document.getElementById('item-harga-beli').value);
         formData.append('harga_jual', document.getElementById('item-harga-jual').value);
-        formData.append('stok', document.getElementById('item-stok').value);
+        formData.append('stok', validStok);
         
         let specs = {};
         document.querySelectorAll('.dynamic-spec-input').forEach(input => {
@@ -212,6 +214,14 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-new-sale').addEventListener('click', () => openTxModal('PENJUALAN'));
     document.getElementById('btn-new-purchase').addEventListener('click', () => openTxModal('PEMBELIAN'));
 
+    // Quick Restock Prompt Confirm Button
+    document.getElementById('btn-confirm-restock').addEventListener('click', () => {
+        document.getElementById('restock-prompt-modal').classList.remove('active');
+        if (pendingRestockItem) {
+            openTxModal('PEMBELIAN', pendingRestockItem);
+        }
+    });
+
     document.getElementById('tx-item-search').addEventListener('input', (e) => {
         const query = e.target.value.toLowerCase();
         if (query.length < 2) {
@@ -222,14 +232,29 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('btn-submit-tx').addEventListener('click', async (e) => {
-        if (txCart.length === 0) return alert('Keranjang kosong!');
+        if (txCart.length === 0) return alert('Keranjang transaksi masih kosong! Silakan cari dan tambahkan barang.');
         
+        const tipe = document.getElementById('tx-type').value;
+
+        // Validasi sisi kasir sebelum dikirim jika PENJUALAN
+        if (tipe === 'PENJUALAN') {
+            for (let item of txCart) {
+                if (item.original && item.original.stok <= 0) {
+                    promptQuickRestock(item.original, item.qty);
+                    return;
+                }
+                if (item.original && item.qty > item.original.stok) {
+                    promptQuickRestock(item.original, item.qty);
+                    return;
+                }
+            }
+        }
+
         const btnSubmit = e.target;
         const originalText = btnSubmit.textContent;
         btnSubmit.textContent = 'Memproses...';
         btnSubmit.disabled = true;
 
-        const tipe = document.getElementById('tx-type').value;
         const tanggal = document.getElementById('tx-date').value;
         const total = txCart.reduce((sum, item) => sum + (item.qty * item.harga_input), 0);
 
@@ -251,14 +276,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            if (res.ok) {
+            const data = await res.json();
+
+            if (res.ok && data.success) {
                 document.getElementById('tx-modal').classList.remove('active');
                 document.getElementById('btn-filter-txlist').click(); 
                 loadDashboard();
                 loadItems();
                 alert('Transaksi berhasil disimpan!');
             } else {
-                alert('Gagal menyimpan transaksi');
+                if (data.item_id && items.find(i => i.id === data.item_id)) {
+                    const targetItem = items.find(i => i.id === data.item_id);
+                    promptQuickRestock(targetItem, data.jumlah_diminta || 1);
+                } else {
+                    alert(`Gagal menyimpan transaksi: ${data.error || 'Terjadi kesalahan sistem'}`);
+                }
             }
         } catch (e) { 
             console.error(e);
@@ -532,7 +564,36 @@ window.deleteTransaction = async function(id) {
 }
 
 // Transaction Cart
-function openTxModal(type) {
+function promptQuickRestock(item, requestedQty = 1) {
+    pendingRestockItem = item;
+    const modal = document.getElementById('restock-prompt-modal');
+    const nameEl = document.getElementById('restock-prompt-item-name');
+    const stockEl = document.getElementById('restock-prompt-stock-info');
+    const msgEl = document.getElementById('restock-prompt-message');
+
+    const merekText = (item.merek && item.merek !== '-') ? `${item.merek} - ` : '';
+    nameEl.textContent = `${merekText}${item.nama_produk}`;
+    
+    let stockStatus = '';
+    if (item.stok < 0) {
+        stockStatus = `Stok saat ini NEGATIF (${item.stok}). Anda perlu melakukan restock minimal ${Math.abs(item.stok) + requestedQty} unit agar stok kembali normal.`;
+    } else if (item.stok === 0) {
+        stockStatus = `Stok saat ini HABIS (0).`;
+    } else {
+        stockStatus = `Stok tersisa hanya ${item.stok} unit (diminta ${requestedQty} unit).`;
+    }
+    stockEl.textContent = stockStatus;
+    msgEl.innerHTML = `Stok barang tidak mencukupi untuk dicatat sebagai penjualan.<br>Apakah Anda ingin langsung membuka halaman <strong>Restock / Beli Barang</strong> untuk produk ini?`;
+
+    modal.classList.add('active');
+}
+
+window.promptQuickRestockById = function(id) {
+    const item = items.find(i => i.id === id);
+    if (item) promptQuickRestock(item, 1);
+};
+
+function openTxModal(type, prefilledItem = null) {
     txCart = [];
     document.getElementById('tx-type').value = type;
     
@@ -543,6 +604,21 @@ function openTxModal(type) {
     document.getElementById('tx-modal-title').textContent = type === 'PENJUALAN' ? 'Catat Penjualan' : 'Restock / Beli Barang';
     document.getElementById('tx-item-search').value = '';
     document.getElementById('tx-search-results').innerHTML = '';
+
+    if (prefilledItem) {
+        const merekText = (prefilledItem.merek && prefilledItem.merek !== '-') ? `${prefilledItem.merek} - ` : '';
+        const suggestedQty = prefilledItem.stok < 0 ? (Math.abs(prefilledItem.stok) + 1) : 1;
+        txCart.push({
+            id: prefilledItem.id,
+            nama_produk: merekText + prefilledItem.nama_produk,
+            harga_dasar: prefilledItem.harga_dasar,
+            harga_jual: prefilledItem.harga_jual,
+            harga_input: type === 'PENJUALAN' ? prefilledItem.harga_jual : prefilledItem.harga_dasar,
+            qty: suggestedQty,
+            original: prefilledItem
+        });
+    }
+
     renderCart();
     document.getElementById('tx-modal').classList.add('active');
 }
@@ -550,17 +626,37 @@ function openTxModal(type) {
 function renderTxSearchResults(results) {
     const container = document.getElementById('tx-search-results');
     container.innerHTML = '';
+    const tipe = document.getElementById('tx-type').value;
     
+    if (results.length === 0) {
+        container.innerHTML = '<div style="padding:15px; text-align:center; color:#64748b; font-size:0.85rem;">Tidak ada barang yang cocok.</div>';
+        return;
+    }
+
     results.forEach(item => {
         const div = document.createElement('div');
         div.className = 'tx-item-card';
         const merekText = (item.merek && item.merek !== '-') ? `${item.merek} - ` : '';
+        const isNegativeOrEmpty = item.stok <= 0;
+        
+        let stockBadge = `Stok: <strong>${item.stok}</strong>`;
+        if (isNegativeOrEmpty) {
+            stockBadge = `<span style="color:var(--danger); font-weight:700;">Stok: ${item.stok} ${item.stok < 0 ? '(Minus)' : '(Habis)'}</span>`;
+        }
+
+        let actionButton = '';
+        if (tipe === 'PENJUALAN' && isNegativeOrEmpty) {
+            actionButton = `<button type="button" class="btn-danger" style="padding: 4px 8px; font-size:0.75rem; white-space:nowrap;" onclick='promptQuickRestockById(${item.id})' title="Stok habis/minus, klik untuk Restock">+ Restock</button>`;
+        } else {
+            actionButton = `<button type="button" class="btn-primary" style="padding: 5px 10px;" onclick='addToCart(${item.id})'>+</button>`;
+        }
+
         div.innerHTML = `
-            <div>
+            <div style="flex:1; margin-right:10px;">
                 <strong>${merekText}${item.nama_produk}</strong><br>
-                <small>Stok: ${item.stok} | Harga Beli: ${formatRp(item.harga_dasar)} | Harga Jual: ${formatRp(item.harga_jual)}</small>
+                <small>${stockBadge} | Beli: ${formatRp(item.harga_dasar)} | Jual: ${formatRp(item.harga_jual)}</small>
             </div>
-            <button class="btn-primary" style="padding: 5px 10px;" onclick='addToCart(${item.id})'>+</button>
+            <div>${actionButton}</div>
         `;
         container.appendChild(div);
     });
@@ -568,8 +664,21 @@ function renderTxSearchResults(results) {
 
 window.addToCart = function(id) {
     const item = items.find(i => i.id === id);
+    if (!item) return;
     const tipe = document.getElementById('tx-type').value;
     const existing = txCart.find(c => c.id === id);
+
+    if (tipe === 'PENJUALAN') {
+        if (item.stok <= 0) {
+            promptQuickRestock(item, 1);
+            return;
+        }
+        if (existing && (existing.qty + 1 > item.stok)) {
+            promptQuickRestock(item, existing.qty + 1);
+            return;
+        }
+    }
+
     const defaultPrice = tipe === 'PENJUALAN' ? item.harga_jual : item.harga_dasar;
     
     if (existing) {
@@ -591,16 +700,28 @@ window.addToCart = function(id) {
 
 window.updateQty = function(id, qty) {
     const item = txCart.find(c => c.id === id);
-    if (item) {
-        item.qty = parseInt(qty) || 1;
-        renderCart();
+    if (!item) return;
+    const tipe = document.getElementById('tx-type').value;
+    let parsed = parseInt(qty);
+    if (isNaN(parsed) || parsed < 1) parsed = 1;
+
+    if (tipe === 'PENJUALAN') {
+        if (parsed > item.original.stok) {
+            promptQuickRestock(item.original, parsed);
+            item.qty = Math.max(1, item.original.stok);
+            renderCart();
+            return;
+        }
     }
+
+    item.qty = parsed;
+    renderCart();
 }
 
 window.updatePrice = function(id, price) {
     const item = txCart.find(c => c.id === id);
     if (item) {
-        item.harga_input = parseInt(price) || 0;
+        item.harga_input = Math.max(0, parseInt(price) || 0);
         renderCart();
     }
 }
@@ -613,19 +734,39 @@ window.removeFromCart = function(id) {
 function renderCart() {
     const tbody = document.getElementById('tx-cart-body');
     tbody.innerHTML = '';
+    const tipe = document.getElementById('tx-type').value;
     let total = 0;
     
+    if (txCart.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8; padding:20px;">Keranjang transaksi masih kosong. Silakan cari barang di sebelah kiri.</td></tr>';
+        document.getElementById('tx-total').textContent = formatRp(0);
+        return;
+    }
+
     txCart.forEach(item => {
         const subtotal = item.harga_input * item.qty;
         total += subtotal;
         
+        let stockWarning = '';
+        if (tipe === 'PENJUALAN') {
+            if (item.original && (item.original.stok <= 0 || item.qty > item.original.stok)) {
+                stockWarning = `<span style="color:var(--danger); font-size:0.75rem; display:block; font-weight:600; margin-top:2px;">⚠️ Sisa Stok: ${item.original ? item.original.stok : 0}</span>`;
+            }
+        }
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>${item.nama_produk} <div style="font-size:0.75rem; color:#64748b; margin-top:3px;">Ref: Beli ${formatRp(item.harga_dasar)} | Jual ${formatRp(item.harga_jual)}</div></td>
-            <td><input type="number" value="${item.harga_input}" onchange="updatePrice(${item.id}, this.value)" style="width:100px; padding:5px;"></td>
-            <td><input type="number" min="1" value="${item.qty}" onchange="updateQty(${item.id}, this.value)" style="width:60px; padding:5px;"></td>
-            <td>${formatRp(subtotal)}</td>
-            <td><button class="btn-danger" style="padding:4px 8px;" onclick="removeFromCart(${item.id})">x</button></td>
+            <td>
+                <strong>${item.nama_produk}</strong>
+                <div style="font-size:0.75rem; color:#64748b; margin-top:3px;">
+                    Ref: Beli ${formatRp(item.harga_dasar)} | Jual ${formatRp(item.harga_jual)} ${item.original ? `| Stok: ${item.original.stok}` : ''}
+                </div>
+                ${stockWarning}
+            </td>
+            <td><input type="number" min="0" value="${item.harga_input}" onchange="updatePrice(${item.id}, this.value)" style="width:100px; padding:5px;"></td>
+            <td><input type="number" min="1" ${tipe === 'PENJUALAN' ? `max="${Math.max(1, item.original.stok)}"` : ''} value="${item.qty}" onchange="updateQty(${item.id}, this.value)" style="width:60px; padding:5px;"></td>
+            <td><strong>${formatRp(subtotal)}</strong></td>
+            <td><button class="btn-danger" style="padding:4px 8px;" onclick="removeFromCart(${item.id})" title="Hapus">✕</button></td>
         `;
         tbody.appendChild(tr);
     });

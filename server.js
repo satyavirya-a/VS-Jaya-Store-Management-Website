@@ -91,20 +91,21 @@ app.post('/api/items', upload.single('image'), async (req, res) => {
         imageUrl = `data:${req.file.mimetype};base64,${b64}`;
     }
     
+    const validStok = Math.max(0, parseInt(stok) || 0);
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
         const q = `INSERT INTO items (nama_produk, jenis_produk, merek, harga_dasar, harga_jual, stok, image_url, spesifikasi) 
                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`;
-        const resItem = await client.query(q, [nama_produk, jenis_produk, merek || '-', parseInt(harga_dasar)||0, parseInt(harga_jual)||0, parseInt(stok)||0, imageUrl, spesifikasi || '{}']);
+        const resItem = await client.query(q, [nama_produk, jenis_produk, merek || '-', parseInt(harga_dasar)||0, parseInt(harga_jual)||0, validStok, imageUrl, spesifikasi || '{}']);
         const itemId = resItem.rows[0].id;
         
         const txQ = `INSERT INTO transactions (tipe_transaksi, total_transaksi, tanggal) VALUES ('PEMBELIAN', $1, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jakarta')) RETURNING id`;
-        const txRes = await client.query(txQ, [(parseInt(harga_dasar)||0) * (parseInt(stok)||0)]);
+        const txRes = await client.query(txQ, [(parseInt(harga_dasar)||0) * validStok]);
         const txId = txRes.rows[0].id;
         
         await client.query(`INSERT INTO transaction_details (transaction_id, item_id, jumlah, harga_satuan, keuntungan) VALUES ($1, $2, $3, $4, 0)`, 
-        [txId, itemId, parseInt(stok)||0, parseInt(harga_dasar)||0]);
+        [txId, itemId, validStok, parseInt(harga_dasar)||0]);
         
         await client.query('COMMIT');
         res.json({ id: itemId });
@@ -130,7 +131,7 @@ app.post('/api/items/bulk', async (req, res) => {
             const m = item['Merek'] || item.merek || item.merk || '-';
             const dasar = parseInt(item['Harga Dasar'] || item.harga_dasar || item['Harga Beli'] || item.harga_beli || 0) || 0;
             const jual = parseInt(item['Harga Jual'] || item.harga_jual || 0) || 0;
-            const s = parseInt(item['Stok'] || item.stok || 0) || 0;
+            const s = Math.max(0, parseInt(item['Stok'] || item.stok || 0) || 0);
 
             let specs = {};
             const standardKeys = ['Nama Produk', 'nama_produk', 'nama', 'Jenis Produk', 'jenis_produk', 'kategori', 'Merek', 'merek', 'merk', 'Harga Dasar', 'harga_dasar', 'harga_beli', 'Harga Beli', 'Harga Jual', 'harga_jual', 'Stok', 'stok', 'Keterangan', '__rowNum__'];
@@ -157,15 +158,16 @@ app.post('/api/items/bulk', async (req, res) => {
 app.put('/api/items/:id', upload.single('image'), async (req, res) => {
     const { id } = req.params;
     const { nama_produk, jenis_produk, merek, harga_dasar, harga_jual, stok, spesifikasi } = req.body;
+    const validStok = Math.max(0, parseInt(stok) || 0);
     try {
         if (req.file) {
             const b64 = req.file.buffer.toString('base64');
             const imageUrl = `data:${req.file.mimetype};base64,${b64}`;
             const q = `UPDATE items SET nama_produk=$1, jenis_produk=$2, merek=$3, harga_dasar=$4, harga_jual=$5, stok=$6, image_url=$7, spesifikasi=$8 WHERE id=$9`;
-            await pool.query(q, [nama_produk, jenis_produk, merek, parseInt(harga_dasar)||0, parseInt(harga_jual)||0, parseInt(stok)||0, imageUrl, spesifikasi || '{}', id]);
+            await pool.query(q, [nama_produk, jenis_produk, merek, parseInt(harga_dasar)||0, parseInt(harga_jual)||0, validStok, imageUrl, spesifikasi || '{}', id]);
         } else {
             const q = `UPDATE items SET nama_produk=$1, jenis_produk=$2, merek=$3, harga_dasar=$4, harga_jual=$5, stok=$6, spesifikasi=$7 WHERE id=$8`;
-            await pool.query(q, [nama_produk, jenis_produk, merek, parseInt(harga_dasar)||0, parseInt(harga_jual)||0, parseInt(stok)||0, spesifikasi || '{}', id]);
+            await pool.query(q, [nama_produk, jenis_produk, merek, parseInt(harga_dasar)||0, parseInt(harga_jual)||0, validStok, spesifikasi || '{}', id]);
         }
         res.json({ updated: true });
     } catch(err) { res.status(500).json({ error: err.message }); }
@@ -181,26 +183,65 @@ app.delete('/api/items/:id', async (req, res) => {
 // APIs: Transactions
 app.post('/api/transactions', async (req, res) => {
     const { tipe_transaksi, total_transaksi, items, tanggal } = req.body;
+    if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: 'Daftar barang dalam transaksi tidak boleh kosong.' });
+    }
+
     let tanggalFormatted = tanggal ? tanggal.replace('T', ' ') + (tanggal.length <= 16 ? ':00' : '') : new Date(Date.now() + 7 * 3600 * 1000).toISOString().replace('T', ' ').substring(0, 19);
     
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
+
+        // Validasi ketersediaan stok terlebih dahulu jika PENJUALAN
+        if (tipe_transaksi === 'PENJUALAN') {
+            for (let item of items) {
+                const qty = parseInt(item.jumlah) || 0;
+                if (qty <= 0) {
+                    await client.query('ROLLBACK');
+                    return res.status(400).json({ error: 'Jumlah barang harus lebih dari 0.' });
+                }
+
+                const itemCheck = await client.query('SELECT id, nama_produk, stok, harga_dasar FROM items WHERE id = $1 FOR UPDATE', [item.item_id]);
+                if (itemCheck.rows.length === 0) {
+                    await client.query('ROLLBACK');
+                    return res.status(404).json({ error: `Barang dengan ID ${item.item_id} tidak ditemukan.` });
+                }
+
+                const currentItem = itemCheck.rows[0];
+                if (currentItem.stok < qty) {
+                    await client.query('ROLLBACK');
+                    return res.status(400).json({ 
+                        error: `Stok untuk "${currentItem.nama_produk}" tidak mencukupi! (Tersedia: ${currentItem.stok}, Diminta: ${qty})`,
+                        item_id: currentItem.id,
+                        nama_produk: currentItem.nama_produk,
+                        stok_tersedia: currentItem.stok,
+                        jumlah_diminta: qty
+                    });
+                }
+            }
+        }
+
         const txRes = await client.query(`INSERT INTO transactions (tipe_transaksi, total_transaksi, tanggal) VALUES ($1, $2, $3) RETURNING id`, 
             [tipe_transaksi, parseInt(total_transaksi)||0, tanggalFormatted]);
         const txId = txRes.rows[0].id;
         
         for(let item of items) {
-            let k = 0, sc = 0;
+            const qty = parseInt(item.jumlah) || 0;
+            const hargaSatuan = parseInt(item.harga_satuan) || 0;
+
             if (tipe_transaksi === 'PENJUALAN') {
-                k = (item.harga_satuan - item.harga_dasar_saat_ini) * item.jumlah;
-                sc = -item.jumlah;
-                await client.query(`INSERT INTO transaction_details (transaction_id, item_id, jumlah, harga_satuan, keuntungan) VALUES ($1, $2, $3, $4, $5)`, [txId, item.item_id, item.jumlah, item.harga_satuan, k]);
-                await client.query(`UPDATE items SET stok = stok + $1 WHERE id = $2`, [sc, item.item_id]);
+                const hargaDasar = parseInt(item.harga_dasar_saat_ini) || 0;
+                const k = (hargaSatuan - hargaDasar) * qty;
+                await client.query(`INSERT INTO transaction_details (transaction_id, item_id, jumlah, harga_satuan, keuntungan) VALUES ($1, $2, $3, $4, $5)`, [txId, item.item_id, qty, hargaSatuan, k]);
+                await client.query(`UPDATE items SET stok = stok - $1 WHERE id = $2`, [qty, item.item_id]);
             } else if (tipe_transaksi === 'PEMBELIAN') {
-                sc = item.jumlah;
-                await client.query(`INSERT INTO transaction_details (transaction_id, item_id, jumlah, harga_satuan, keuntungan) VALUES ($1, $2, $3, $4, 0)`, [txId, item.item_id, item.jumlah, item.harga_satuan]);
-                await client.query(`UPDATE items SET stok = stok + $1, harga_dasar = $2 WHERE id = $3`, [sc, item.harga_satuan, item.item_id]);
+                if (qty <= 0) {
+                    await client.query('ROLLBACK');
+                    return res.status(400).json({ error: 'Jumlah barang masuk harus lebih dari 0.' });
+                }
+                await client.query(`INSERT INTO transaction_details (transaction_id, item_id, jumlah, harga_satuan, keuntungan) VALUES ($1, $2, $3, $4, 0)`, [txId, item.item_id, qty, hargaSatuan]);
+                await client.query(`UPDATE items SET stok = stok + $1, harga_dasar = $2 WHERE id = $3`, [qty, hargaSatuan, item.item_id]);
             }
         }
         await client.query('COMMIT');

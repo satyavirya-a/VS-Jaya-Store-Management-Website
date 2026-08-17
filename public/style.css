@@ -195,7 +195,6 @@ header {
 .w-100 { width: 100%; }
 .mt-2 { margin-top: 15px; }
 
-/* Forms & Modals */
 .modal-overlay {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
@@ -206,6 +205,8 @@ header {
     z-index: 100;
 }
 .modal-overlay.active { display: flex; }
+#restock-prompt-modal { z-index: 110; }
+#restock-prompt-modal .modal-content { box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1); }
 
 .modal-content {
     background: var(--white);
